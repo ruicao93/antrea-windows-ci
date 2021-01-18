@@ -61,7 +61,7 @@ function InstallOVSInternal($nsxOVS) {
         & $GetNSXOVSFilePath -OutPutFile $NSXOVSFilePath
         & $OVSInstallationFilePath -LocalFile $NSXOVSFilePath
     } else {
-        & $OVSInstallationFilePath $params
+        & $OVSInstallationFilePath
     }
     return $true
 }
