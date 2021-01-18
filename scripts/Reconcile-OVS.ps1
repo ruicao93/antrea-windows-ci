@@ -168,7 +168,3 @@ if ($Operation -like $OP_INSTALL) {
     $Operation = $OP_UNINSTALL
     UninstallOVS
 }
-
-
-
-
