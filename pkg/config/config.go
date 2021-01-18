@@ -90,8 +90,9 @@ func NewSSHClient(hostConfig *HostConfig) (*ssh.Client, error) {
 
 func NewTasks(ciConfig *CIConfig) (map[string]*Task, error) {
 	taskMap := make(map[string]*Task)
-	for _, task := range ciConfig.Tasks {
-		taskMap[task.Name] = &task
+	for i := 0; i < len(ciConfig.Tasks); i++ {
+		task := &ciConfig.Tasks[i]
+		taskMap[task.Name] = task
 	}
 	return taskMap, nil
 }
@@ -99,8 +100,9 @@ func NewTasks(ciConfig *CIConfig) (map[string]*Task, error) {
 func NewHosts(ciConfig *CIConfig, taskMap map[string]*Task) ([]*Host, error) {
 	var err error
 	hosts := make([]*Host, 0, len(ciConfig.Hosts))
-	for _, hostConfig := range ciConfig.Hosts {
-		host := Host{HostConfig: &hostConfig}
+	for i := 0; i < len(ciConfig.Hosts); i++ {
+		hostConfig := &ciConfig.Hosts[i]
+		host := Host{HostConfig: hostConfig}
 		//host.Tasks = []*Task{}
 		for _, taskName := range hostConfig.Tasks {
 			if task, ok := taskMap[taskName]; !ok {

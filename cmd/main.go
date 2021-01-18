@@ -55,7 +55,7 @@ func main() {
 	klog.Infof("******** Start works ********")
 	for _, host := range hosts {
 		wg.Add(1)
-		go func() {
+		go func(host *config.Host) {
 			if err := features.ApplyHost(host); err != nil {
 				host.Success = false
 				host.Error = fmt.Errorf("failed to apply host %s: %v", host.HostConfig.Host, err)
@@ -63,7 +63,7 @@ func main() {
 				host.Success = true
 			}
 			wg.Done()
-		}()
+		}(host)
 	}
 	wg.Wait()
 	klog.Infof("******** Works complete ********")
@@ -88,6 +88,8 @@ func DumpResults(hosts []*config.Host) {
 		result = "fail!"
 	}
 	klog.Infof("Result: %s", result)
+	klog.Infof("Success: %d", len(successfulHosts))
+	klog.Infof("Fail: %d", len(failureHosts))
 	for index, host := range failureHosts {
 		klog.Infof("====== %d. Failure host: %s", index+1, host.HostConfig.Host)
 		klog.Info(host.Error)

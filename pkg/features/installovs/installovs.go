@@ -144,9 +144,7 @@ func InstallOVS(host *config.Host, expectedVersion string, nsxOVS bool) error {
 	// 1. Download script to $BaseDir
 	client := host.Client
 	sshClient := host.SSHClient
-	if err := util.RemoveDir(client, BaseDir); err != nil {
-		return err
-	}
+	_ = util.RemoveDir(client, BaseDir)
 	if err := util.CreateDir(client, BaseDir); err != nil {
 		return err
 	}
@@ -267,6 +265,9 @@ func ApplyFeature(host *config.Host, feature *config.Feature) error {
 	}
 	//if err := PostInstallOVS(host, expectedVersion); err != nil {
 	//	return fmt.Errorf("failed to check OVS after installation on host %s: %v", host.HostConfig.Host, err)
+	//}
+	//if err := util.RestartComputer(host, true); err != nil {
+	//	return err
 	//}
 	return nil
 }

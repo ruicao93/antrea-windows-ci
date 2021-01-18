@@ -56,13 +56,13 @@ function InstallOVSInternal($nsxOVS) {
     Remove-DirIfExist $OVSDir
     New-DirectoryIfNotExist $BaseDir
     Get-WebFileIfNotExist $OVSInstallationFilePath $OVSInstallationFileUrl
-    $params = ""
     if ($nsxOVS) {
-        $params = $params + "-LocalFile $NSXOVSFilePath"
         Get-WebFileIfNotExist $GetNSXOVSFilePath $GetNSXOVSFileUrl
         & $GetNSXOVSFilePath -OutPutFile $NSXOVSFilePath
+        & $OVSInstallationFilePath -LocalFile $NSXOVSFilePath
+    } else {
+        & $OVSInstallationFilePath $params
     }
-    & $OVSInstallationFilePath $params
     return $true
 }
 
