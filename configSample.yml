@@ -1,0 +1,63 @@
+dryRun: false
+tasks:
+  - name: Install-Windows-Container-DisableHyperV
+    feature:
+      name: WindowsContainer
+      args:
+        - DisableHyperV
+  - name: Install-Windows-Container-EnableHyperV-SkipCPUCheck
+    feature:
+      name: WindowsContainer
+      args:
+        - SkipCPUCheck
+  - name: Install-Upstream-OVS
+    feature:
+      name: InstallOVS
+      KeyValues:
+        ovsVersion: 2.14.0
+  - name: Install-NSX-OVS
+    feature:
+      name: InstallOVS
+      KeyValues:
+        ovsType: nsx
+        ovsVersion: 2.13.1.36081
+hosts:
+  # ======== a-ms-2002-win-0: Disable Hyper-V && NSX-OVS =======
+  - host: 10.176.26.33
+    port: 5985
+    user: Administrator
+    password: ca$hc0w
+    tasks:
+      - Install-Windows-Container-DisableHyperV
+  - host: 10.176.26.32
+      port: 5985
+      user: Administrator
+      password: ca$hc0w
+      tasks:
+        - Install-Windows-Container-DisableHyperV
+  # ======== a-ms-2000-win-0: Enable Hyper-V without CPU check && NSX-OVS =======
+  - host: 10.176.25.244
+    port: 5985
+    user: Administrator
+    password: ca$hc0w
+    tasks:
+      - Install-Windows-Container-EnableHyperV-SkipCPUCheck
+  - host: 10.176.25.194
+      port: 5985
+      user: Administrator
+      password: ca$hc0w
+      tasks:
+        - Install-Windows-Container-EnableHyperV-SkipCPUCheck
+  # ======== a-ms-1001-0:  ContainerD && Enable Hyper-V without CPU check && Upstream OVS =======
+  - host: 10.176.25.103
+    port: 5985
+    user: Administrator
+    password: ca$hc0w
+    tasks:
+      - Install-Windows-Container-EnableHyperV-SkipCPUCheck
+  - host: 10.176.26.16
+      port: 5985
+      user: Administrator
+      password: ca$hc0w
+      tasks:
+        - Install-Windows-Container-EnableHyperV-SkipCPUCheck
