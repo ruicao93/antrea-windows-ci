@@ -3,45 +3,48 @@ package config
 import (
 	"fmt"
 	"github.com/masterzen/winrm"
+	"golang.org/x/crypto/ssh"
 	"k8s.io/klog"
+	"time"
 )
 
 const (
-	DefaultUser  = "Administrator"
+	DefaultUser = "Administrator"
 )
 
 type Feature struct {
-	Name string `yaml:"name"`
-	Args []string `yaml:"args,omitempty"`
+	Name      string            `yaml:"name"`
+	Args      []string          `yaml:"args,omitempty"`
 	KeyValues map[string]string `yaml:"keyValues,omitempty"`
 }
 
 type Task struct {
-	Name string `yaml:"name"`
+	Name    string  `yaml:"name"`
 	Feature Feature `yaml:"feature"`
 }
 
 type HostConfig struct {
-	Host string `yaml:"host"`
-	Port int  `yaml:"port"`
-	User string `yaml:"user,omitempty"`
-	DryRun bool `yaml:"dryRun,omitempty"`
-	Password string `yaml:"password"`
-	Tasks []string `yaml:"tasks"`
+	Host     string   `yaml:"host"`
+	Port     int      `yaml:"port"`
+	User     string   `yaml:"user,omitempty"`
+	DryRun   bool     `yaml:"dryRun,omitempty"`
+	Password string   `yaml:"password"`
+	Tasks    []string `yaml:"tasks"`
 }
 
 type CIConfig struct {
-	Hosts []HostConfig  `yaml:"hosts"`
-	Tasks []Task `yaml:"tasks"`
-	DryRun bool `yaml:"dryRun,omitempty"`
+	Hosts  []HostConfig `yaml:"hosts"`
+	Tasks  []Task       `yaml:"tasks"`
+	DryRun bool         `yaml:"dryRun,omitempty"`
 }
 
 type Host struct {
 	HostConfig *HostConfig
-	Tasks []*Task
-	Success bool
-	Error error
-	Client *winrm.Client
+	Tasks      []*Task
+	Success    bool
+	Error      error
+	Client     *winrm.Client
+	SSHClient  *ssh.Client
 }
 
 func (hostConfig *HostConfig) SetDefaults() {
@@ -73,6 +76,18 @@ func NewWinRMClient(hostConfig *HostConfig) (*winrm.Client, error) {
 	return client, nil
 }
 
+func NewSSHClient(hostConfig *HostConfig) (*ssh.Client, error) {
+	sshConfig := &ssh.ClientConfig{
+		Timeout:         time.Second, //ssh 连接time out 时间一秒钟, 如果ssh验证错误 会在一秒内返回
+		User:            hostConfig.User,
+		Auth:            []ssh.AuthMethod{ssh.Password(hostConfig.Password)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), //这个可以， 但是不够安全
+		//HostKeyCallback: hostKeyCallBackFunc(h.Host),
+	}
+	addr := fmt.Sprintf("%s:%d", hostConfig.Host, 22)
+	return ssh.Dial("tcp", addr, sshConfig)
+}
+
 func NewTasks(ciConfig *CIConfig) (map[string]*Task, error) {
 	taskMap := make(map[string]*Task)
 	for _, task := range ciConfig.Tasks {
@@ -97,6 +112,11 @@ func NewHosts(ciConfig *CIConfig, taskMap map[string]*Task) ([]*Host, error) {
 		if host.Client, err = NewWinRMClient(host.HostConfig); err != nil {
 			return hosts, fmt.Errorf("failed to init winrm client for host %s: %v", hostConfig.Host, err)
 		}
+
+		if host.SSHClient, err = NewSSHClient(host.HostConfig); err != nil {
+			return hosts, fmt.Errorf("failed to init ssh client for host %s: %v", hostConfig.Host, err)
+		}
+
 		hosts = append(hosts, &host)
 	}
 	return hosts, nil

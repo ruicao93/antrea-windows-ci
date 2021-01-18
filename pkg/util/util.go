@@ -1,14 +1,49 @@
 package util
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/masterzen/winrm"
 	"github.com/ruicao93/antrea-windows-ci/pkg/config"
+	"golang.org/x/crypto/ssh"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 	"strings"
 	"time"
 )
+
+func SSHCommand(client *ssh.Client, cmd string) (code int, stdout string, stderr string, err error) {
+	session, err := client.NewSession()
+	if err != nil {
+		return 0, "", "", fmt.Errorf("cannot create SSH session: %v", err)
+	}
+	defer session.Close()
+
+	var stdoutB, stderrB bytes.Buffer
+	session.Stdout = &stdoutB
+	session.Stderr = &stderrB
+	if err := session.Run(cmd); err != nil {
+		switch e := err.(type) {
+		case *ssh.ExitMissingError:
+			return 0, "", "", fmt.Errorf("did not get an exit status for SSH command: %v", e)
+		case *ssh.ExitError:
+			// SSH operation successful, but command returned error code
+			return e.ExitStatus(), stdoutB.String(), stderrB.String(), nil
+		default:
+			return 0, "", "", fmt.Errorf("unknown error when executing SSH command: %v", err)
+		}
+	}
+	// command is successful
+	return 0, stdoutB.String(), stderrB.String(), nil
+}
+
+func InvokeSSHCommand(client *ssh.Client, cmd string) error {
+	rc, stdout, stderr, err := SSHCommand(client, cmd)
+	if err != nil || rc != 0 {
+		return fmt.Errorf("failed to execute cmd %s, rc: %d, stdout: %s, stderr: %s, err: %v", cmd, rc, stdout, stderr, err)
+	}
+	return nil
+}
 
 func CallPSCommand(client *winrm.Client, cmd string) (string, error) {
 	stdout, stderr, rc, err := client.RunPSWithString(cmd, "")
@@ -40,7 +75,7 @@ func RestartComputer(host *config.Host, waitReboot bool) error {
 		return nil
 	}
 	// Wait down
-	err = wait.PollImmediate(10 * time.Second, 3 * time.Minute, func() (done bool, err error) {
+	err = wait.PollImmediate(10*time.Second, 3*time.Minute, func() (done bool, err error) {
 		if _, err := CallPSCommand(client, "ls"); err != nil {
 			klog.Infof("host %s is down now", host.HostConfig.Host)
 			return true, nil
@@ -53,7 +88,7 @@ func RestartComputer(host *config.Host, waitReboot bool) error {
 	}
 
 	// Wait up
-	err = wait.PollImmediate(10 * time.Second, 10 * time.Minute, func() (done bool, err error) {
+	err = wait.PollImmediate(10*time.Second, 10*time.Minute, func() (done bool, err error) {
 		if _, err := CallPSCommand(client, "ls"); err != nil {
 			klog.Infof("Waiting for host %s up", host.HostConfig.Host)
 			return false, nil
@@ -84,12 +119,12 @@ func RemoveDir(client *winrm.Client, path string) error {
 	return InvokePSCommand(client, cmd)
 }
 
-func DownloadFile(client *winrm.Client, url, dstPath string, removeOnExist bool) error {
-	cmd := fmt.Sprintf("curl.exe -sLo %s %s", dstPath, url)
+func DownloadFile(client *ssh.Client, url, dstPath string, removeOnExist bool) error {
+	cmd := fmt.Sprintf("powershell.exe 'curl.exe -sLo %s %s'", dstPath, url)
 	//if removeOnExist {
 	//	cmd = fmt.Sprintf("rm -Force %s && %s", dstPath, cmd)
 	//}
-	return InvokePSCommand(client, cmd)
+	return InvokeSSHCommand(client, cmd)
 }
 
 func GetService(client *winrm.Client, svcName string) (string, error) {

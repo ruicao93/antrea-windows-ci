@@ -19,7 +19,7 @@ $GetNSXOVSFileUrl = "https://raw.githubusercontent.com/ruicao93/antrea/nsx_ovs_g
 $OVSInstallationFilePath = Join-Path -Path $BaseDir -ChildPath "Install-OVS.ps1"
 $OVSUninstallationFilePath = Join-Path -Path $BaseDir -ChildPath "Uninstall-OVS.ps1"
 $GetNSXOVSFilePath = Join-Path -Path $BaseDir -ChildPath "Get-NSXOVS.ps1"
-$NSXOVSFilePath = Join-Path -Path $BaseDir -ChildPath "nsx-ovs.zip"
+$NSXOVSFilePath = Join-Path -Path $BaseDir -ChildPath "win-ovs.zip"
 
 
 function New-DirectoryIfNotExist($Path)
@@ -60,7 +60,7 @@ function InstallOVSInternal($nsxOVS) {
     if ($nsxOVS) {
         $params = $params + "-LocalFile $NSXOVSFilePath"
         Get-WebFileIfNotExist $GetNSXOVSFilePath $GetNSXOVSFileUrl
-        & $GetNSXOVSFileUrl -OutPutFile $NSXOVSFilePath
+        & $GetNSXOVSFilePath -OutPutFile $NSXOVSFilePath
     }
     & $OVSInstallationFilePath $params
     return $true
@@ -133,7 +133,11 @@ function InstallOVS() {
     if (DriverExists) {
         DeleteDrivers
     }
-    $res = InstallOVSInternal
+    $NSX_OVS = $false
+    if ($OVSType -eq $TYPE_NSX) {
+        $NSX_OVS = $true
+    }
+    $res = InstallOVSInternal $NSX_OVS
     if ($res) {
         exit 0
     } else {

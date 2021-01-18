@@ -8,21 +8,24 @@ import (
 	"path"
 	"strings"
 )
-const (
-	BaseDir = `C:\antrea-windows-ci\ovs-install`
-	OVSInstallationFileUrl = "https://raw.githubusercontent.com/ruicao93/antrea/nsx_ovs_install_disableHV/hack/windows/Install-OVS.ps1"
-	OVSUninstallationFileUrl = "https://raw.githubusercontent.com/ruicao93/antrea/nsx_ovs_install_disableHV/hack/windows/Uninstall-OVS.ps1"
-	GetNSXOVSFileUrl = "https://raw.githubusercontent.com/ruicao93/antrea/nsx_ovs_get/hack/windows/Get-NSXOVS.ps1"
 
-	OVSDir = `c:\openvswitch`
+const (
+	BaseDir                  = `C:/antrea-windows-ci/ovs-install`
+	OVSInstallationFileUrl   = "https://raw.githubusercontent.com/ruicao93/antrea/nsx_ovs_install_disableHV/hack/windows/Install-OVS.ps1"
+	OVSUninstallationFileUrl = "https://raw.githubusercontent.com/ruicao93/antrea/nsx_ovs_install_disableHV/hack/windows/Uninstall-OVS.ps1"
+	GetNSXOVSFileUrl         = "https://raw.githubusercontent.com/ruicao93/antrea/nsx_ovs_get/hack/windows/Get-NSXOVS.ps1"
+	ReconcileOVSFileUrl      = "https://raw.githubusercontent.com/ruicao93/antrea-windows-ci/main/scripts/Reconcile-OVS.ps1"
+
+	OVSDir            = `c:/openvswitch`
 	OVSDriverProvider = `The Linux Foundation (R)`
 )
 
 var (
-	OVSInstallationFilePath = path.Join(BaseDir, "Install-OVS.ps1")
+	OVSInstallationFilePath   = path.Join(BaseDir, "Install-OVS.ps1")
 	OVSUninstallationFilePath = path.Join(BaseDir, "Uninstall-OVS.ps1")
-	GetNSXOVSFilePath = path.Join(BaseDir, "Get-NSXOVS.ps1")
-	NSXOVSFilePath = path.Join(BaseDir, "nsx-ovs.zip")
+	ReconcileOVSFilePath      = path.Join(BaseDir, "Reconcile-OVS.ps1")
+	GetNSXOVSFilePath         = path.Join(BaseDir, "Get-NSXOVS.ps1")
+	NSXOVSFilePath            = path.Join(BaseDir, "nsx-ovs.zip")
 )
 
 func GetOVSVersion(host *config.Host) (string, error) {
@@ -50,7 +53,6 @@ func GetNSXOVS(client *winrm.Client) error {
 	return util.PathExists(client, NSXOVSFilePath)
 }
 
-
 func installOVSInternal(host *config.Host, nsxOVS bool) error {
 	client := host.Client
 	// RM dir
@@ -68,11 +70,11 @@ func installOVSInternal(host *config.Host, nsxOVS bool) error {
 	if err := util.CreateDir(client, BaseDir); err != nil {
 		return err
 	}
-	if err := util.DownloadFile(client, OVSInstallationFileUrl, OVSInstallationFilePath, true); err != nil {
+	if err := util.DownloadFile(host.SSHClient, OVSInstallationFileUrl, OVSInstallationFilePath, true); err != nil {
 		return err
 	}
 	if nsxOVS {
-		if err := util.DownloadFile(client, GetNSXOVSFileUrl, GetNSXOVSFilePath, true); err != nil {
+		if err := util.DownloadFile(host.SSHClient, GetNSXOVSFileUrl, GetNSXOVSFilePath, true); err != nil {
 			return err
 		}
 		if err := GetNSXOVS(client); err != nil {
@@ -100,8 +102,8 @@ func getOVSDriverNames(client *winrm.Client) ([]string, error) {
 	lines := strings.Split(out, "\n")
 	for index, line := range lines {
 		if strings.Contains(line, OVSDriverProvider) {
-			words := strings.Fields(lines[index - 1])
-			drivers = append(drivers, words[len(words) - 1])
+			words := strings.Fields(lines[index-1])
+			drivers = append(drivers, words[len(words)-1])
 		}
 	}
 	return drivers, err
@@ -113,7 +115,7 @@ func uninstallOVSInternal(host *config.Host) error {
 	if err := util.CreateDir(client, BaseDir); err != nil {
 		return err
 	}
-	if err := util.DownloadFile(client, OVSUninstallationFileUrl, OVSUninstallationFilePath, true); err != nil {
+	if err := util.DownloadFile(host.SSHClient, OVSUninstallationFileUrl, OVSUninstallationFilePath, true); err != nil {
 		return err
 	}
 	// Call Script
@@ -139,6 +141,30 @@ func uninstallOVSInternal(host *config.Host) error {
 }
 
 func InstallOVS(host *config.Host, expectedVersion string, nsxOVS bool) error {
+	// 1. Download script to $BaseDir
+	client := host.Client
+	sshClient := host.SSHClient
+	if err := util.RemoveDir(client, BaseDir); err != nil {
+		return err
+	}
+	if err := util.CreateDir(client, BaseDir); err != nil {
+		return err
+	}
+	if err := util.DownloadFile(sshClient, ReconcileOVSFileUrl, ReconcileOVSFilePath, false); err != nil {
+		return err
+	}
+	args := " -Operation install"
+	if nsxOVS {
+		args += " -OVSType nsx"
+	}
+	if expectedVersion != "" {
+		args += fmt.Sprintf(" -ExpectedVersion %s", expectedVersion)
+	}
+	cmd := fmt.Sprintf("powershell.exe '%s %s'", ReconcileOVSFilePath, args)
+	return util.InvokeSSHCommand(sshClient, cmd)
+}
+
+func InstallOVSDeprecated(host *config.Host, expectedVersion string, nsxOVS bool) error {
 	client := host.Client
 	ovsInstalled, err := OVSInstalled(host)
 	if err != nil {
@@ -152,7 +178,7 @@ func InstallOVS(host *config.Host, expectedVersion string, nsxOVS bool) error {
 
 	versionCheck, err := VersionCheck(host, expectedVersion)
 	if err != nil {
-		return  err
+		return err
 	}
 	if versionCheck {
 		return nil
@@ -193,7 +219,7 @@ func InstallOVS(host *config.Host, expectedVersion string, nsxOVS bool) error {
 	return nil
 }
 
-func PostInstallOVS(host *config.Host, expectedVersion string) error {
+func PostInstallOVSDeprecated(host *config.Host, expectedVersion string) error {
 	ovsInstalled, err := OVSInstalled(host)
 	if err != nil {
 		return err
@@ -203,7 +229,7 @@ func PostInstallOVS(host *config.Host, expectedVersion string) error {
 	}
 	versionCheck, err := VersionCheck(host, expectedVersion)
 	if err != nil {
-		return  err
+		return err
 	}
 	if !versionCheck {
 		return fmt.Errorf("unexpected OVS version")
@@ -211,7 +237,7 @@ func PostInstallOVS(host *config.Host, expectedVersion string) error {
 	return nil
 }
 
-func PostUnInstallOVS(host *config.Host, expectedVersion string) error {
+func PostUnInstallOVSDeprecated(host *config.Host, expectedVersion string) error {
 	ovsInstalled, err := OVSInstalled(host)
 	if err != nil {
 		return err
@@ -229,7 +255,6 @@ func PostUnInstallOVS(host *config.Host, expectedVersion string) error {
 	return nil
 }
 
-
 func ApplyFeature(host *config.Host, feature *config.Feature) error {
 	expectedVersion := feature.GetValue(KeyOVSVersion)
 	nsxOVS := false
@@ -240,10 +265,8 @@ func ApplyFeature(host *config.Host, feature *config.Feature) error {
 	if err := InstallOVS(host, expectedVersion, nsxOVS); err != nil {
 		return fmt.Errorf("failed to install OVS on host %s: %v", host.HostConfig.Host, err)
 	}
-	if err := PostInstallOVS(host, expectedVersion); err != nil {
-		return fmt.Errorf("failed to check OVS after installation on host %s: %v", host.HostConfig.Host, err)
-	}
+	//if err := PostInstallOVS(host, expectedVersion); err != nil {
+	//	return fmt.Errorf("failed to check OVS after installation on host %s: %v", host.HostConfig.Host, err)
+	//}
 	return nil
 }
-
-

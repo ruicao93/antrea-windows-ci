@@ -68,6 +68,9 @@ func main() {
 	wg.Wait()
 	klog.Infof("******** Works complete ********")
 	DumpResults(hosts)
+	for _, host := range hosts {
+		host.SSHClient.Close()
+	}
 }
 
 func DumpResults(hosts []*config.Host) {
@@ -86,7 +89,7 @@ func DumpResults(hosts []*config.Host) {
 	}
 	klog.Infof("Result: %s", result)
 	for index, host := range failureHosts {
-		klog.Infof("====== %d. Failure host: %s", index + 1, host.HostConfig.Host)
+		klog.Infof("====== %d. Failure host: %s", index+1, host.HostConfig.Host)
 		klog.Info(host.Error)
 	}
 }
